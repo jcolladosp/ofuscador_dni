@@ -1,8 +1,8 @@
-# Ofuscador de DNI (ODNI) 
+# Ofuscador de DNI 
 
 ## 📌 Sobre este proyecto
 
-**Creado por Alfonso E.M.**
+Forkeado de https://github.com/alfem/odni
 
 Esta herramienta nace de la necesidad de proteger nuestros datos personales en un mundo donde cada vez más entidades solicitan copias de nuestro DNI sin justificación real.
 
@@ -39,6 +39,7 @@ Con esta herramienta puedes generar copias de tu DNI **marcadas específicamente
 5. **Marca de agua personalizable**: Añade texto sobre la foto (ej: "copia para el hotel")
 6. **Editor visual interactivo**: Arrastra y redimensiona las áreas con el ratón
 7. **Vista previa en tiempo real**: Ve el resultado antes de procesarlo
+8. **Imagen en blanco y negro**: Permite 
 
 ---
 
@@ -52,7 +53,7 @@ Con esta herramienta puedes generar copias de tu DNI **marcadas específicamente
 
 1. **Descarga y abre el archivo**: Haz doble clic en `dni-processor.html`
    
-3. **O usa la versión online**: https://alfem.github.io/odni/  (puedes comprobar que no hace ninguna conexión a ningún servidor)
+3. **O usa la versión online**: https://collado.pw/ofuscador_dni/  (puedes comprobar que no hace ninguna conexión a ningún servidor)
 
 4. **Sube las imágenes**:
    - Carga el anverso (cara frontal) del DNI
