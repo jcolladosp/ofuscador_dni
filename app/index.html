@@ -277,7 +277,9 @@
           </div>
 
           <div class="upload">
-            <p class="field-legend">Reverso</p>
+            <p class="field-legend">
+              Reverso <span class="tag-optional">opcional</span>
+            </p>
             <button
               type="button"
               class="upload-zone"
@@ -309,6 +311,21 @@
               aria-label="Imagen del reverso"
             />
           </div>
+        </div>
+
+        <div class="actions">
+          <p class="field-note">
+            Con el anverso basta para continuar. Añade el reverso solo si el
+            destinatario lo necesita.
+          </p>
+          <button
+            class="btn btn-primary"
+            id="continueUpload"
+            onclick="startCropStep()"
+            disabled
+          >
+            Continuar
+          </button>
         </div>
       </section>
 
@@ -414,7 +431,7 @@
                 <canvas id="previewCanvasAnverso"></canvas>
               </div>
             </div>
-            <div class="preview">
+            <div class="preview" id="previewReverso">
               <p class="field-legend">Reverso</p>
               <div class="canvas-frame">
                 <canvas id="previewCanvasReverso"></canvas>
@@ -639,7 +656,7 @@
           </div>
         </div>
 
-        <div>
+        <div id="reversoAreasSection">
           <div class="section-head">
             <h3>Áreas a difuminar · reverso</h3>
             <button
@@ -735,10 +752,14 @@
 
         <div class="btn-row">
           <button class="btn" onclick="downloadAnverso()">Anverso (PNG)</button>
-          <button class="btn" onclick="downloadReverso()">Reverso (PNG)</button>
-          <button class="btn btn-accent" onclick="exportToPDF()">
-            Ambas caras (PDF)
+          <button
+            class="btn"
+            id="downloadReversoBtn"
+            onclick="downloadReverso()"
+          >
+            Reverso (PNG)
           </button>
+          <button class="btn btn-accent" onclick="exportToPDF()">PDF</button>
         </div>
 
         <div class="actions">

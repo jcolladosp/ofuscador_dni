@@ -105,7 +105,7 @@ function handleAnversoUpload() {
       img.onload = function () {
         anversoImage = img;
         markZoneLoaded('uploadAnverso', 'Anverso cargado');
-        checkBothUploaded();
+        refreshUploadState();
       };
       img.src = e.target.result;
     };
@@ -122,7 +122,7 @@ function handleReversoUpload() {
       img.onload = function () {
         reversoImage = img;
         markZoneLoaded('uploadReverso', 'Reverso cargado');
-        checkBothUploaded();
+        refreshUploadState();
       };
       img.src = e.target.result;
     };
@@ -140,13 +140,17 @@ function markZoneLoaded(zoneId, title) {
   zone.querySelector('.upload-title').textContent = title;
 }
 
-function checkBothUploaded() {
-  if (anversoImage && reversoImage) {
-    updateStep(1, 'completed');
-    updateStep(2, 'active');
-    document.getElementById('line1').classList.add('completed');
-    showCropAnversoSection();
-  }
+function refreshUploadState() {
+  document.getElementById('continueUpload').disabled = !anversoImage;
+}
+
+function startCropStep() {
+  if (!anversoImage) return;
+
+  updateStep(1, 'completed');
+  updateStep(2, 'active');
+  document.getElementById('line1').classList.add('completed');
+  showCropAnversoSection();
 }
 
 function showCropAnversoSection() {
@@ -250,23 +254,32 @@ function drawCropCanvas(side) {
   }
 }
 
+// El lienzo se muestra a un tamaño CSS que no tiene por qué coincidir con su búfer
+function toCanvasCoords(canvas, clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((clientX - rect.left) / rect.width) * canvas.width,
+    y: ((clientY - rect.top) / rect.height) * canvas.height,
+  };
+}
+
 function setupCropEvents(side) {
   const canvas = cropState[side].canvas;
   const state = cropState[side];
 
   canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    state.startX = e.clientX - rect.left;
-    state.startY = e.clientY - rect.top;
+    const pos = toCanvasCoords(canvas, e.clientX, e.clientY);
+    state.startX = pos.x;
+    state.startY = pos.y;
     state.selecting = true;
   });
 
   canvas.addEventListener('mousemove', (e) => {
     if (!state.selecting) return;
 
-    const rect = canvas.getBoundingClientRect();
-    state.currentX = e.clientX - rect.left;
-    state.currentY = e.clientY - rect.top;
+    const pos = toCanvasCoords(canvas, e.clientX, e.clientY);
+    state.currentX = pos.x;
+    state.currentY = pos.y;
 
     const x = Math.min(state.startX, state.currentX);
     const y = Math.min(state.startY, state.currentY);
@@ -284,10 +297,10 @@ function setupCropEvents(side) {
   // Touch events para móvil
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    state.startX = touch.clientX - rect.left;
-    state.startY = touch.clientY - rect.top;
+    const pos = toCanvasCoords(canvas, touch.clientX, touch.clientY);
+    state.startX = pos.x;
+    state.startY = pos.y;
     state.selecting = true;
   });
 
@@ -295,10 +308,10 @@ function setupCropEvents(side) {
     e.preventDefault();
     if (!state.selecting) return;
 
-    const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    state.currentX = touch.clientX - rect.left;
-    state.currentY = touch.clientY - rect.top;
+    const pos = toCanvasCoords(canvas, touch.clientX, touch.clientY);
+    state.currentX = pos.x;
+    state.currentY = pos.y;
 
     const x = Math.min(state.startX, state.currentX);
     const y = Math.min(state.startY, state.currentY);
@@ -370,8 +383,14 @@ function applyCropAnverso() {
 function proceedToReverso() {
   document.getElementById('cropAnversoSection').classList.add('hidden');
   updateStep(2, 'completed');
-  updateStep(3, 'active');
   document.getElementById('line2').classList.add('completed');
+
+  if (!reversoImage) {
+    proceedToProcess();
+    return;
+  }
+
+  updateStep(3, 'active');
   document.getElementById('cropReversoSection').classList.remove('hidden');
   initCropCanvas('reverso', reversoImage);
   document
@@ -454,6 +473,18 @@ function proceedToProcess() {
   updateStep(4, 'active');
   document.getElementById('line3').classList.add('completed');
   document.getElementById('processSection').classList.remove('hidden');
+
+  // Sin reverso, sus controles y su lienzo no tienen nada que mostrar
+  const hasReverso = Boolean(croppedReverso);
+  document
+    .getElementById('previewReverso')
+    .classList.toggle('hidden', !hasReverso);
+  document
+    .getElementById('reversoAreasSection')
+    .classList.toggle('hidden', !hasReverso);
+  document
+    .getElementById('downloadReversoBtn')
+    .classList.toggle('hidden', !hasReverso);
 
   // Inicializar previsualizaciones
   setupPreviewListeners();
@@ -956,11 +987,7 @@ function setupCanvasInteraction(canvas, side, image) {
   const state = editingState[side];
 
   function getMousePos(e) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    return toCanvasCoords(canvas, e.clientX, e.clientY);
   }
 
   function getAreas() {
@@ -1233,7 +1260,9 @@ function processImages() {
   processedAnverso = processImage(croppedAnverso, 'anverso');
 
   // Procesar reverso
-  processedReverso = processImage(croppedReverso, 'reverso');
+  processedReverso = croppedReverso
+    ? processImage(croppedReverso, 'reverso')
+    : null;
 
   // Mostrar sección de descarga
   updateStep(4, 'completed');
@@ -1486,8 +1515,8 @@ function imageToJpegBinary(img, quality = 0.92) {
   };
 }
 
-// Genera un PDF válido a mano (sin librerías externas) con las dos imágenes apiladas
-function buildTwoImagePdf(images) {
+// Genera un PDF válido a mano (sin librerías externas) apilando las imágenes
+function buildImagePdf(images) {
   const pageWidth = 595.28; // A4 en puntos
   const margin = 30;
   const gap = 20;
@@ -1498,13 +1527,18 @@ function buildTwoImagePdf(images) {
     h: img.height * (contentWidth / img.width),
   }));
 
-  const pageHeight = margin * 2 + gap + dims[0].h + dims[1].h;
-  const y1 = pageHeight - margin - dims[0].h;
-  const y2 = y1 - gap - dims[1].h;
-  const positions = [
-    { x: margin, y: y1, w: dims[0].w, h: dims[0].h },
-    { x: margin, y: y2, w: dims[1].w, h: dims[1].h },
-  ];
+  const pageHeight =
+    margin * 2 +
+    gap * (images.length - 1) +
+    dims.reduce((total, d) => total + d.h, 0);
+
+  let cursorY = pageHeight - margin;
+  const positions = dims.map((d) => {
+    cursorY -= d.h;
+    const position = { x: margin, y: cursorY, w: d.w, h: d.h };
+    cursorY -= gap;
+    return position;
+  });
 
   const content = positions
     .map(
@@ -1512,6 +1546,14 @@ function buildTwoImagePdf(images) {
         `q\n${p.w.toFixed(2)} 0 0 ${p.h.toFixed(2)} ${p.x.toFixed(2)} ${p.y.toFixed(2)} cm\n/Im${i + 1} Do\nQ\n`,
     )
     .join('');
+
+  const firstImageObj = 4;
+  const contentObj = firstImageObj + images.length;
+  const objectCount = contentObj;
+
+  const xobjects = images
+    .map((_, i) => `/Im${i + 1} ${firstImageObj + i} 0 R`)
+    .join(' ');
 
   const chunks = [];
   const offsets = [];
@@ -1531,11 +1573,11 @@ function buildTwoImagePdf(images) {
 
   offsets[3] = offset;
   push(
-    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /XObject << /Im1 4 0 R /Im2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n`,
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /XObject << ${xobjects} >> >> /Contents ${contentObj} 0 R >>\nendobj\n`,
   );
 
-  [4, 5].forEach((objNum, i) => {
-    const img = images[i];
+  images.forEach((img, i) => {
+    const objNum = firstImageObj + i;
     offsets[objNum] = offset;
     push(
       `${objNum} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.binary.length} >>\nstream\n`,
@@ -1544,18 +1586,20 @@ function buildTwoImagePdf(images) {
     push('\nendstream\nendobj\n');
   });
 
-  offsets[6] = offset;
-  push(`6 0 obj\n<< /Length ${content.length} >>\nstream\n`);
+  offsets[contentObj] = offset;
+  push(`${contentObj} 0 obj\n<< /Length ${content.length} >>\nstream\n`);
   push(content);
   push('endstream\nendobj\n');
 
   const xrefOffset = offset;
-  let xref = 'xref\n0 7\n0000000000 65535 f \n';
-  for (let i = 1; i <= 6; i++) {
+  let xref = `xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= objectCount; i++) {
     xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
   }
   push(xref);
-  push(`trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  push(
+    `trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
+  );
 
   const fullStr = chunks.join('');
   const bytes = new Uint8Array(fullStr.length);
@@ -1566,20 +1610,14 @@ function buildTwoImagePdf(images) {
 }
 
 async function exportToPDF() {
-  if (!processedAnverso || !processedReverso) {
+  if (!processedAnverso) {
     alert('Primero procesa las imágenes');
     return;
   }
   try {
-    const [imgAnverso, imgReverso] = await Promise.all([
-      loadImageFromSrc(processedAnverso),
-      loadImageFromSrc(processedReverso),
-    ]);
-
-    const pdfBytes = buildTwoImagePdf([
-      imageToJpegBinary(imgAnverso),
-      imageToJpegBinary(imgReverso),
-    ]);
+    const sources = [processedAnverso, processedReverso].filter(Boolean);
+    const loaded = await Promise.all(sources.map(loadImageFromSrc));
+    const pdfBytes = buildImagePdf(loaded.map((img) => imageToJpegBinary(img)));
 
     const url = URL.createObjectURL(
       new Blob([pdfBytes], { type: 'application/pdf' }),
